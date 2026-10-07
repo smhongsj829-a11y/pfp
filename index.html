@@ -406,6 +406,14 @@ function parseLine(raw,base){
   take(new RegExp('(?:^|\\s)(\\d{1,2})월\\s*(\\d{1,2})일'+P),m=>md(+m[1],+m[2]));
   take(new RegExp('(?:^|\\s)(\\d{1,2})[/.](\\d{1,2})'+P),m=>md(+m[1],+m[2]));
   take(new RegExp('(?:^|\\s)(오늘|내일|모레|글피)'+P),m=>addDays(now,['오늘','내일','모레','글피'].indexOf(m[1])));
+  // 요일 범위: "금토일", "금~일", "금요일~일요일" (앞에 이번주/다음주 가능)
+  const wkRange=(pre,a,b)=>{const mon=addDays(now,-((now.getDay()+6)%7)),ix=c=>(DOW.indexOf(c)+6)%7;
+    let sI=ix(a),eI=ix(b);if(eI<sI)eI+=7;let st=addDays(mon,sI),en=addDays(mon,eI);
+    if(pre&&!pre.startsWith('이번')){st=addDays(st,7);en=addDays(en,7)}
+    else if(!pre&&en<now){st=addDays(st,7);en=addDays(en,7)}
+    if(en<=st)return null;endD=en;return st};
+  take(/(?:^|\s)(?:(이번\s?주|다음\s?주|담주)\s*)?([월화수목금토일])(?:요일)?\s*[~～\-–—]\s*([월화수목금토일])(?:요일)?(?=\s|$|에|까지|부터)/,m=>m[2]===m[3]?null:wkRange(m[1],m[2],m[3]));
+  take(/(?:^|\s)(?:(이번\s?주|다음\s?주|담주)\s*)?([월화수목금토일]{2,7})(?:요일)?(?=\s|$|에|까지|부터)/,m=>{const w=m[2];if(['금일','일일','화일','수일'].includes(w))return null;return wkRange(m[1],w[0],w[w.length-1])});
   take(new RegExp('(?:^|\\s)(?:(이번\\s?주|다음\\s?주|담주)\\s*)?([월화수목금토일])요일'+P),m=>{
     const mon=addDays(now,-((now.getDay()+6)%7));
     let r=addDays(mon,(DOW.indexOf(m[2])+6)%7);
