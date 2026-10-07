@@ -26,7 +26,8 @@ button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wrap{max-width:940px;margin:0 auto;padding-inline:20px;padding-block:24px 48px;display:flex;flex-direction:column;gap:14px}
 
-.logo{display:flex;justify-content:center;padding-block:32px 24px}
+.logo{display:flex;flex-direction:column;align-items:center;gap:10px;padding-block:32px 24px}
+.logo .note{margin:0;font-size:10px;font-weight:350;color:#6A6A6A;letter-spacing:0}
 .logo span{font-family:"Playfair Display","Bodoni 72",Didot,Georgia,serif;font-style:italic;font-weight:600;font-size:68px;line-height:1;letter-spacing:-.02em;color:var(--accent);user-select:none}
 .bar{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:8px 8px 8px 16px}
 .bar:focus-within{border-color:var(--muted)}
@@ -210,7 +211,7 @@ input[type=text]{width:100%;border:1px solid var(--line);background:var(--sunken
 </head>
 <body>
 <div class="wrap">
-  <div class="logo"><span role="img" aria-label="pfp, Plan for P">pfp.</span></div>
+  <div class="logo"><span role="img" aria-label="pfp, Plan for P">pfp.</span><p class="note">*데스크탑에 최적화된 테스트 모델입니다.</p></div>
   <div class="bar">
     <label for="dump">TDL</label>
     <textarea id="dump" rows="1" placeholder="여기 막 적으면 알아서 캘린더에 쑉"></textarea>
