@@ -162,6 +162,7 @@ button{cursor:pointer}
 .empty{color:var(--muted);font-size:14px;padding:6px 0}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 input[type=text]{width:100%;border:1px solid var(--line);background:var(--sunken);border-radius:8px;padding:9px 10px}
+.tabs,.helpbtn2{display:none}
 .helpbtn{color:var(--accent)}
 .helpbtn:hover{color:var(--accent);border-color:var(--accent)}
 #helpTitle{color:var(--accent)}
@@ -199,32 +200,44 @@ input[type=text]{width:100%;border:1px solid var(--line);background:var(--sunken
 #backdrop #quickForm .btn{margin-left:4px;padding-inline:14px}
 @media (max-width:760px){
   .wrap{padding-inline:16px}
-  .logo{padding-block:2px 0}
+  .logo{padding-block:14px 22px}
   .logo .mark{font-size:26px}
   .today{padding:8px 6px 2px}
   .today .tt{font-size:15.5px}
   .logo{padding-left:6px}
   .splash .mark{font-size:68px}
+  .wrap{padding-bottom:96px}
+  .logo{justify-content:space-between;align-items:center}
+  .helpbtn2{display:inline-flex;margin-left:auto}
+  .head .helpbtn{display:none}
+  .wrap[data-tab=today] .p-cal{display:none}
+  .wrap[data-tab=cal] .p-today{display:none}
+  .wrap[data-tab=cal] .note.foot,.wrap[data-tab=cal] .quote{display:none}
+  .tabs{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:4;gap:8px;padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));background:rgba(0,0,0,.92);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid var(--line)}
+  .tabs button{flex:1;min-height:42px;border-radius:12px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:14px;font-weight:600}
+  .tabs button[aria-selected=true]{background:var(--surface);border-color:var(--line);color:var(--accent)}
   .bar{flex-wrap:nowrap;padding:6px 6px 6px 14px;gap:8px}
   .bar label{display:none}
   .bar textarea{padding:8px 0}
   .bar textarea::placeholder{font-size:12.5px;line-height:1.5;white-space:nowrap}
   .bar .btn{min-height:34px;padding:3px 11px}
   .month{font-size:24px}
+  .head{margin-top:16px}
+  .today{margin-top:6px}
   .grid{border:0;border-radius:0}
   .grid>:nth-child(7n+1){border-left:0}
-  .cell{min-height:58px;padding:4px;align-items:center;gap:4px}
-  .chips{gap:3px}
-  .chip{height:5px;border-radius:2px;font-size:0;line-height:0;background:var(--cat);display:block}
-  .chip.ev{background:transparent;box-shadow:inset 0 0 0 1px var(--cat)}
-  .chip.done{opacity:.3}
-  .chip .hl,.chip .t{display:none}
-  .chip.span.bl{margin-left:-5px}
-  .chip.span.br{margin-right:-4px}
-  .chip.span{padding-left:0}
-  .chip.span.ev{background:transparent;box-shadow:none}
-  .chip.span.done{background:var(--cat);opacity:.3;text-decoration:none}
-  .more{font-size:10px;line-height:1;text-align:center}
+  .cell{min-height:92px;padding:4px 2px 3px;align-items:center;gap:4px}
+  .chips{gap:2px}
+  .chip{height:14px;border-radius:3px;font-size:9px;line-height:14px;display:block;overflow:hidden}
+  .chip .hl{display:block;padding:0 2px;font-size:9px;line-height:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:3px}
+  .chip .tm{display:none}
+  .chip.ev .hl{line-height:12px}
+  .chip.span{padding-left:2px;font-weight:500}
+  .chip.span .t{font-size:9px;line-height:14px;max-width:calc(var(--n,1)*100% + (var(--n,1) - 1)*5px - 6px)}
+  .chip.span.ev .t{line-height:12px}
+  .chip.span.bl{margin-left:-3px}
+  .chip.span.br{margin-right:-3px}
+  .more{font-size:9px;line-height:1;text-align:center}
   .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top,0px));z-index:20;max-width:calc(100vw - 32px);font-size:13px}
   input[type=text],textarea,select{font-size:16px !important}
   #backdrop input[type=text]{padding:10px 12px}
@@ -248,29 +261,32 @@ input[type=text]{width:100%;border:1px solid var(--line);background:var(--sunken
   <p class="stag">P들을 위한 AI 플래너</p>
   <svg class="bars" viewBox="0 0 92 40" fill="none" aria-hidden="true"><rect class="b b1" x="16" y="2" width="60" height="7" rx="3.5" fill="#B7D9FA"/><rect class="b b2" x="26" y="16" width="40" height="7" rx="3.5" fill="#F7C6DB"/><rect class="b b3" x="10" y="30" width="72" height="7" rx="3.5" fill="#BEE8CF"/></svg>
 </div>
-<div class="wrap">
-  <div class="logo"><span class="mark" role="img" aria-label="pfp, Plan for P">pfp.</span></div>
-  <section class="today" id="today" aria-label="오늘 할 일 요약"></section>
-  <div class="bar">
+<div class="wrap" id="wrap" data-tab="cal">
+  <div class="logo"><span class="mark" role="img" aria-label="pfp, Plan for P">pfp.</span><button class="btn helpbtn helpbtn2" id="helpBtn2" aria-haspopup="dialog">어떻게 써?</button></div>
+  <section class="today p-today" id="today" aria-label="오늘 할 일 요약"></section>
+  <div class="bar p-cal">
     <label for="dump">TDL</label>
     <textarea id="dump" rows="1" placeholder="여기 막 적으면 알아서 캘린더에 쑉"></textarea>
     <button class="btn primary" id="dumpAdd">캘린더에 넣기</button>
   </div>
-  <ul class="preview" id="preview"></ul>
+  <ul class="preview p-cal" id="preview"></ul>
 
-  <div class="head">
+  <div class="head p-cal">
     <h1 class="month" id="monthTitle"></h1>
     <button class="btn helpbtn" id="helpBtn" aria-haspopup="dialog">어떻게 써?</button>
     <button class="btn" id="prev" aria-label="이전 달">‹</button>
     <button class="btn" id="todayBtn">오늘</button>
     <button class="btn" id="next" aria-label="다음 달">›</button>
   </div>
-  <div class="overdue" id="overdue" hidden></div>
-  <div class="grid" id="grid"></div>
-  <div class="legend" id="legend"></div>
-  <p class="quote" id="quote"></p>
-  <p class="note foot">*데스크탑에 최적화된 테스트 모델입니다.</p>
+  <div class="overdue p-today" id="overdue" hidden></div>
+  <div class="grid p-cal" id="grid"></div>
+  <div class="legend p-cal" id="legend"></div>
+  <p class="quote p-today" id="quote"></p>
 </div>
+<nav class="tabs" id="tabs" role="tablist" aria-label="화면 전환">
+  <button role="tab" id="tabCal" data-tab="cal" aria-selected="true">캘린더</button>
+  <button role="tab" id="tabToday" data-tab="today" aria-selected="false">오늘</button>
+</nav>
 
 <div class="backdrop" id="backdrop" hidden>
   <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="dayTitle">
@@ -609,13 +625,15 @@ function toast(msg,undo){$('toastMsg').textContent=msg;undoFn=undo||null;$('toas
 $('toastUndo').onclick=()=>{if(undoFn)undoFn();undoFn=null;$('toast').hidden=true};
 
 // ── 조작
-function go(k,show){sel=k;const d=parseYmd(k);view={y:d.getFullYear(),m:d.getMonth()};if(show){open=true;$('backdrop').hidden=false}render();if(show)$('quick').focus()}
+function setTab(t){const w=$('wrap');if(!w)return;w.dataset.tab=t;document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));window.scrollTo(0,0)}
+$('tabs').onclick=e=>{const b=e.target.closest('button');if(b)setTab(b.dataset.tab)};
+function go(k,show){if(show)setTab('cal');sel=k;const d=parseYmd(k);view={y:d.getFullYear(),m:d.getMonth()};if(show){open=true;$('backdrop').hidden=false}render();if(show)$('quick').focus()}
 function closeDay(){open=false;$('backdrop').hidden=true;render()}
 $('closeDay').onclick=closeDay;
 $('backdrop').onclick=e=>{if(e.target===$('backdrop'))closeDay()};
 function openHelp(){$('helpBackdrop').hidden=false;$('helpClose').focus()}
 function closeHelp(){$('helpBackdrop').hidden=true;$('helpBtn').focus()}
-$('helpBtn').onclick=openHelp;$('helpClose').onclick=closeHelp;
+$('helpBtn').onclick=openHelp;$('helpBtn2').onclick=openHelp;$('helpClose').onclick=closeHelp;
 $('helpBackdrop').onclick=e=>{if(e.target===$('helpBackdrop'))closeHelp()};
 let pickedColor=PALETTE[0];
 function drawSwatches(){$('swatches').innerHTML=(PALETTE.includes(pickedColor)?PALETTE:[pickedColor].concat(PALETTE)).map(c=>'<button type="button" class="sw'+(c===pickedColor?' on':'')+'" data-c="'+c+'" style="--sw:'+c+'" aria-label="색 '+c+'" aria-pressed="'+(c===pickedColor)+'"></button>').join('')}
