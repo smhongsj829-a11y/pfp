@@ -394,7 +394,16 @@ function parseLine(raw,base){
   let t=raw.replace(/^\s*(?:[-*•·]|\d+[.)])\s*/,'').trim();
   if(!t)return null;
   const orig=t,now=parseYmd(today()),P='(?:까지|에는|은|에)?(?=\\s|$)';
-  let d=null,endD=null;
+  let d=null,endD=null,rec=null;
+  {const WD='[월화수목금토일]',SX='(?:요일|욜|요)',wn=str=>[...new Set([...str].map(c=>DOW.indexOf(c)))];
+   const cut=m=>{t=(t.slice(0,m.index)+' '+t.slice(m.index+m[0].length)).replace(/\s+/g,' ').trim()};
+   let m;
+   if(m=t.match(new RegExp('(?:^|\\s)(?:매주\\s*)?('+WD+'{1,7})'+SX+'?\\s*마다(?=\\s|$)'))){rec={days:wn(m[1])};cut(m)}
+   else if(m=t.match(new RegExp('(?:^|\\s)매주\\s*('+WD+'{1,7})'+SX+'?(?=\\s|$|에)'))){rec={days:wn(m[1])};cut(m)}
+   else if(m=t.match(/(?:^|\s)(평일마다|매주\s*평일)(?=\s|$)/)){rec={days:[1,2,3,4,5]};cut(m)}
+   else if(m=t.match(/(?:^|\s)(주말마다|매주\s*주말)(?=\s|$)/)){rec={days:[0,6]};cut(m)}
+   else if(m=t.match(/(?:^|\s)(매일|날마다|하루도)(?=\s|$)/)){rec={days:[0,1,2,3,4,5,6]};cut(m)}
+   else if(m=t.match(/(?:^|\s)(매주|주마다)(?=\s|$)/)){rec={days:null};cut(m)}}
   const take=(re,fn)=>{if(d)return;const m=t.match(re);if(!m)return;const r=fn(m);if(!r)return;d=r;
     t=(t.slice(0,m.index)+' '+t.slice(m.index+m[0].length)).replace(/\s+/g,' ').trim()};
   const md=(mo,da)=>{if(mo<1||mo>12||da<1||da>31)return null;let y=now.getFullYear();
@@ -424,16 +433,23 @@ function parseLine(raw,base){
     return r});
   take(new RegExp('(?:^|\\s)(\\d{1,2})일'+P),m=>{const b=parseYmd(base),r=new Date(b.getFullYear(),b.getMonth(),+m[1]);
     return +m[1]>=1&&r.getMonth()===b.getMonth()?r:null});
-  let time=null;
-  {const m=t.match(/(?:^|\s)(오전|오후|아침|저녁|밤|새벽|낮)?\s*(\d{1,2})(?::(\d{2})|시(?:\s*(\d{1,2})분|\s*(반))?)(?=\s|$|에|부터|까지|쯤|경)/);
-   if(m){let h=+m[2];const mi=+(m[3]||m[4]||(m[5]?30:0)),ap=m[1];
-     const rest=(t.slice(0,m.index)+' '+t.slice(m.index+m[0].length));
-     if(h<24&&mi<60){
+  let time=null,time2=null;
+  {const NUM={열두:12,열한:11,열:10,아홉:9,여덟:8,일곱:7,여섯:6,다섯:5,네:4,세:3,두:2,한:1};
+   t=t.replace(/(^|[^가-힣])(열두|열한|열|아홉|여덟|일곱|여섯|다섯|네|세|두|한)\s?시(?!간)/g,(m,a,w)=>a+NUM[w]+'시');
+   const TM='(?:(오전|오후|아침|저녁|밤|새벽|낮)?\\s*(\\d{1,2})(?::(\\d{2})|시(?!간|작|험|청|장|내|민|대|사|선|골|력|도|절)(?:\\s*(\\d{1,2})분|\\s*(반))?))';
+   const m=t.match(new RegExp('(^|[^\\d:./])'+TM+'(?:\\s*[~～\\-–—]\\s*'+TM.replace(/\(\?:\(오전/,'(?:(오전')+')?(?:에서|에|부터|까지|쯤|경)?'));
+   if(m){const mins=(ap,hs,mi1,mi2,half,hint,base)=>{let h=+hs;const mi=+(mi1||mi2||(half?30:0));if(h>=24||mi>=60)return null;
        if(ap&&/오후|저녁|밤|낮/.test(ap)){if(h<12)h+=12}
        else if(ap){if(h===12)h=0}
+       else if(base!=null){while(h<12&&h*60+mi<=base)h+=12}
        else if(h>=1&&h<=6)h+=12;
-       else if(h>=7&&h<=11&&/저녁|밤/.test(rest))h+=12;
-       time=String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');
+       else if(h>=7&&h<=11&&/저녁|밤/.test(hint))h+=12;
+       return h*60+mi};
+     const fmt=v=>String(Math.floor(v/60)).padStart(2,'0')+':'+String(v%60).padStart(2,'0');
+     const rest=t.slice(0,m.index)+m[1]+' '+t.slice(m.index+m[0].length);
+     const a=mins(m[2],m[3],m[4],m[5],m[6],rest);
+     if(a!=null){time=fmt(a);
+       if(m[8]!==undefined||m[9]!==undefined){const b=mins(m[7],m[8],m[9],m[10],m[11],rest,a);if(b!=null&&b>a)time2=fmt(b)}
        t=rest.replace(/\s+/g,' ').trim()}}}
   const core=(t||orig).trim(),until=!!d&&/까지(?=\s|$)/.test(orig);
   const verbal=/기$/.test(core.replace(/[.!~\s]+$/,''))||/해야\s*(?:함|해|돼|한다|지|겠다)[.!~\s]*$/.test(core);
@@ -441,19 +457,24 @@ function parseLine(raw,base){
   const person=meetV||isPerson(core);
   let title=tidy(core);
   if(meetV)title=title.replace(/\s*만나(?:기|야\s*(?:함|해|돼|한다|지))?$/,'').trim()+' 만남';
-  const isEv0=!verbal&&(!!time||!!endD||until||EV.some(w=>core.includes(w))||/\d{1,2}시|\d{1,2}:\d{2}/.test(core));
+  const isEv0=!verbal&&(!!time||!!endD||until||EV.some(w=>core.includes(w))||/\d{1,2}시(?!간)|\d{1,2}:\d{2}/.test(core));
   const isEv=person||isEv0;
   let cat=categorize(core);
   if(verbal&&!person&&cat==='etc')cat='todo';
   if(person&&cat==='etc'){const m=customTags.find(c=>c.k==='meet'||c.n==='약속');if(m)cat=m.k}
-  return {title,date:d?ymd(d):base,cat,dated:!!d,kind:isEv?'event':'todo',time,until,end:endD?ymd(endD):null};
+  return {title,date:d?ymd(d):base,cat,dated:!!d,kind:isEv?'event':'todo',time,time2,rec,until,end:endD?ymd(endD):null};
 }
 const EV=['약속','만나','만남','저녁','점심','회의','미팅','예약','시험','제출','마감','발표','면접','생일','모임','수업','강의','병원','치과','여행','데이트','영화','파티','공연','결혼식','행사','세미나','스터디','퀴즈','브런치','진료','검진','미용실','고사'];
-const expand=it=>it?[it]:[];
+const expand=it=>{if(!it)return[];if(!it.rec)return[it];
+  const start=parseYmd(it.date),days=it.rec.days||[start.getDay()],last=new Date(start.getFullYear(),start.getMonth()+1,0),out=[];
+  for(let d=start;d<=last;d=addDays(d,1))if(days.includes(d.getDay()))out.push({...it,date:ymd(d),rec:null,end:null});
+  if(!out.length){let d=addDays(last,1);while(!days.includes(d.getDay()))d=addDays(d,1);out.push({...it,date:ymd(d),rec:null,end:null})}
+  return out};
 // ── 상태
 const splitDump=v=>v.split(/[\n,，]/).flatMap(l=>expand(parseLine(l,today())));
 const isTodo=t=>t.kind!=='event';
 const kor=tm=>{if(!tm)return'';const[h,m]=tm.split(':').map(Number),ap=h<12?'오전':'오후',hh=h%12===0?12:h%12;return ap+' '+hh+'시'+(m?' '+m+'분':'')};
+const korT=t=>{if(!t.time)return'';let r=kor(t.time);if(t.time2){const[h2,m2]=t.time2.split(':').map(Number),same=(+t.time.slice(0,2)<12)===(h2<12);r+='~'+(same?'':(h2<12?'오전 ':'오후 '))+(h2%12===0?12:h2%12)+'시'+(m2?' '+m2+'분':'')}return r};
 const tmChip=t=>t.time?'<span class="tm">'+esc(t.time)+'</span>':'';
 let open=false;
 let todos=[],ready=false,mode='',col=null,sel=today(),view={y:new Date().getFullYear(),m:new Date().getMonth()};
@@ -476,7 +497,7 @@ function addMany(items){
   if(!ready){toast('아직 불러오는 중이에요. 잠시 후 다시 눌러 주세요.');return false}
   if(items.some(it=>it.cat==='todo')&&!customTags.some(c=>c.k==='todo')){customTags=customTags.concat([{k:'todo',n:'할일',c:'#DCDCDC',w:[]}]);saveTags()}
   const t0=Date.now();
-  items.forEach((it,i)=>{const body={title:it.title,date:it.date,cat:it.cat,kind:it.kind==='event'?'event':'todo',done:!!it.done,moved:it.moved||0,created:t0+i};if(it.due)body.due=it.due;if(it.time)body.time=it.time;if(it.end&&it.end>it.date)body.end=it.end;
+  items.forEach((it,i)=>{const body={title:it.title,date:it.date,cat:it.cat,kind:it.kind==='event'?'event':'todo',done:!!it.done,moved:it.moved||0,created:t0+i};if(it.due)body.due=it.due;if(it.time)body.time=it.time;if(it.time2)body.time2=it.time2;if(it.end&&it.end>it.date)body.end=it.end;
     if(mode==='db'){const ref=col.doc();chain(ref.id,()=>ref.set(body))}
     else todos.push({id:'t'+t0+'_'+i+Math.random().toString(36).slice(2,6),...body})});
   if(mode==='local'){saveLocal();render()}
@@ -547,7 +568,7 @@ function render(){
     +'<div class="title"><label'+(ev?'':' for="chk-'+id+'"')+'><span class="hl">'+tmChip(t)+esc(t.title)+'</span></label>'
     +'<span class="meta"><select class="catsel" aria-label="태그"><option value="etc"'+(tagOf(t.cat).k==='etc'?' selected':'')+'>태그 없음</option>'+allTags().map(x=>'<option value="'+esc(x.k)+'"'+(x.k===tagOf(t.cat).k?' selected':'')+'>'+esc(x.n)+'</option>').join('')+'</select>'
     +' · <button class="catbtn" data-act="kind">'+(ev?'할 일로 바꾸기':'일정으로 바꾸기')+'</button>'
-    +(t.time?' · '+kor(t.time):'')+(t.end&&t.end>t.date?' · '+short(t.date)+' ~ '+short(t.end):'')+(t.due?' · 마감 '+short(t.due):'')+(t.moved?' · '+t.moved+'번 미룸':'')+'</span></div>'
+    +(t.time?' · '+korT(t):'')+(t.end&&t.end>t.date?' · '+short(t.date)+' ~ '+short(t.end):'')+(t.due?' · 마감 '+short(t.due):'')+(t.moved?' · '+t.moved+'번 미룸':'')+'</span></div>'
     +(ev||t.done?'<span></span>':'<button class="btn small" data-act="move">'+moveLabel(t.date)+'</button>')
     +'<button class="x" data-act="del" aria-label="'+esc(t.title)+' 삭제">×</button></li>'};
   $('list').innerHTML=list.length?(evs.length?'<li class="sec">일정</li>'+evs.map(row).join(''):'')+(tds.length?'<li class="sec">할 일</li>'+tds.map(row).join(''):'')
@@ -562,7 +583,7 @@ function renderToday(list,td){
   const row=t=>{const ev=!isTodo(t),id=esc(t.id);
     return '<li class="trow'+(!ev&&t.done?' done':'')+'" style="--cat:'+catVar(t.cat)+'">'
       +(ev?'<span class="evdot" aria-hidden="true"></span><span class="hl" style="background:transparent;color:var(--cat);box-shadow:inset 0 0 0 1px var(--cat)">'+esc(t.title)+'</span>'
-        :'<input type="checkbox" data-tid="'+id+'" '+(t.done?'checked':'')+' aria-label="'+esc(t.title)+' 완료"><span class="hl">'+esc(t.title)+'</span>')+(t.time?'<span class="when">'+kor(t.time)+'</span>':'')+'</li>'};
+        :'<input type="checkbox" data-tid="'+id+'" '+(t.done?'checked':'')+' aria-label="'+esc(t.title)+' 완료"><span class="hl">'+esc(t.title)+'</span>')+(t.time?'<span class="when">'+korT(t)+'</span>':'')+'</li>'};
   const sum=!list.length?'':(evs.length?'일정 '+evs.length+'개':'')+(evs.length&&tds.length?' · ':'')+(tds.length?(left?'남은 할 일 '+left+'개':'할 일 모두 끝!'):'');
   $('today').innerHTML='<div class="th"><div class="tt">오늘의 TDL<small>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+DOW[d.getDay()]+'요일</small></div><div class="ts">'+sum+'</div></div>'
     +(list.length?'<ul>'+evs.map(row).join('')+tds.map(row).join('')+'</ul>':'<p class="none">'+(ready?'오늘은 아직 비어 있어요. 아래에 막 적어 보세요.':'불러오는 중…')+'</p>');
@@ -570,7 +591,7 @@ function renderToday(list,td){
 $('today').onchange=e=>{const id=e.target.dataset&&e.target.dataset.tid;if(id)upd(id,{done:e.target.checked})};
 function renderPreview(){
   const items=splitDump($('dump').value);
-  $('preview').innerHTML=items.slice(0,12).map(it=>'<li'+(it.kind==='event'?' class="ev"':'')+' style="--cat:'+catVar(it.cat)+'"><span class="when">'+short(it.date)+(it.end?'~'+short(it.end):'')+(it.time?' '+kor(it.time):'')+' '+(it.kind==='event'?'일정':it.auto?'할 일 자동 추가':'할 일')+'</span><span class="hl">'+esc(it.title)+'</span></li>').join('')
+  $('preview').innerHTML=items.slice(0,12).map(it=>'<li'+(it.kind==='event'?' class="ev"':'')+' style="--cat:'+catVar(it.cat)+'"><span class="when">'+short(it.date)+(it.end?'~'+short(it.end):'')+(it.time?' '+korT(it):'')+' '+(it.kind==='event'?'일정':it.auto?'할 일 자동 추가':'할 일')+'</span><span class="hl">'+esc(it.title)+'</span></li>').join('')
     +(items.length>12?'<li class="when">외 '+(items.length-12)+'개</li>':'');
   $('dumpAdd').textContent=items.length?items.length+'개 캘린더에 넣기':'캘린더에 넣기';
   const ta=$('dump');ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';
