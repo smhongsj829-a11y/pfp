@@ -66,6 +66,8 @@ button{cursor:pointer}
 .bar textarea::placeholder,input::placeholder{color:var(--muted)}
 .preview{list-style:none;margin:-8px 0 0;padding:0 4px;display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
 .preview:empty{display:none}
+.preview li.del .hl{color:#c0392b;background:none;text-decoration:line-through}
+.preview li.del .when{color:#c0392b}
 .preview .when{color:var(--muted);font-variant-numeric:tabular-nums;margin-right:6px}
 
 .head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:28px}
@@ -163,6 +165,8 @@ button{cursor:pointer}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 input[type=text]{width:100%;border:1px solid var(--line);background:var(--sunken);border-radius:8px;padding:9px 10px}
 .tabs,.helpbtn2{display:none}
+.undo:disabled{opacity:.3;cursor:default}
+.undo:not(:disabled){color:var(--accent)}
 .helpbtn{color:var(--accent)}
 .helpbtn:hover{color:var(--accent);border-color:var(--accent)}
 #helpTitle{color:var(--accent)}
@@ -210,6 +214,8 @@ input[type=text]{width:100%;border:1px solid var(--line);background:var(--sunken
   .logo{justify-content:space-between;align-items:center}
   .helpbtn2{display:inline-flex;margin-left:auto}
   .head .helpbtn{display:none}
+  .undo .ut{display:none}
+  .undo{min-width:40px}
   .wrap[data-tab=today] .p-cal{display:none}
   .wrap[data-tab=cal] .p-today{display:none}
   .wrap[data-tab=cal] .note.foot,.wrap[data-tab=cal] .quote{display:none}
@@ -274,6 +280,7 @@ input[type=text]{width:100%;border:1px solid var(--line);background:var(--sunken
   <div class="head p-cal">
     <h1 class="month" id="monthTitle"></h1>
     <button class="btn helpbtn" id="helpBtn" aria-haspopup="dialog">어떻게 써?</button>
+    <button class="btn undo" id="undoBtn" aria-label="이전으로 되돌리기" title="이전으로 되돌리기 (Ctrl/Cmd+Z)" disabled><span aria-hidden="true">↶</span><span class="ut"> 되돌리기</span></button>
     <button class="btn" id="prev" aria-label="이전 달">‹</button>
     <button class="btn" id="todayBtn">오늘</button>
     <button class="btn" id="next" aria-label="다음 달">›</button>
@@ -487,7 +494,11 @@ const expand=it=>{if(!it)return[];if(!it.rec)return[it];
   if(!out.length){let d=addDays(last,1);while(!days.includes(d.getDay()))d=addDays(d,1);out.push({...it,date:ymd(d),rec:null,end:null})}
   return out};
 // ── 상태
-const splitDump=v=>v.split(/[\n,，]/).flatMap(l=>expand(parseLine(l,today())));
+const DEL_RE=/^\s*(.+?)\s*(?:일정|할\s*일|할일|들|전부|모두|전체|다|싹|전부다)?\s*(?:을|를)?\s*(?:전부|모두|전체|다|싹)?\s*(?:삭제|지워|지우기|지우자|지움|없애|제거)\s*(?:해\s*줘|해줘|해|하기|해주세요|줘|주세요|요|해라)?\s*[.!~]*\s*$/;
+function parseDel(l){const m=DEL_RE.exec(l);if(!m)return null;const k=m[1].replace(/\s*(일정|할\s*일|할일|들|전부|모두|전체)$/,'').replace(/[을를]$/,'').trim();return k&&k.length>=1?k:null}
+const hits=k=>todos.filter(t=>(t.title||'').includes(k));
+function splitAll(v){const dels=[],items=[];v.split(/[\n,，]/).forEach(l=>{if(!l.trim())return;const k=parseDel(l);if(k)dels.push(k);else items.push(...expand(parseLine(l,today())))});return{dels,items}}
+const splitDump=v=>splitAll(v).items;
 const isTodo=t=>t.kind!=='event';
 const kor=tm=>{if(!tm)return'';const[h,m]=tm.split(':').map(Number),ap=h<12?'오전':'오후',hh=h%12===0?12:h%12;return ap+' '+hh+'시'+(m?' '+m+'분':'')};
 const korT=t=>{if(!t.time)return'';let r=kor(t.time);if(t.time2){const[h2,m2]=t.time2.split(':').map(Number),same=(+t.time.slice(0,2)<12)===(h2<12);r+='~'+(same?'':(h2<12?'오전 ':'오후 '))+(h2%12===0?12:h2%12)+'시'+(m2?' '+m2+'분':'')}return r};
@@ -509,28 +520,44 @@ function fail(e){const c=e&&e.code;
   toast(c==='quota_exceeded'?'저장 공간이 가득 찼어요. 지난 할 일을 지워 주세요.':
         c==='invalid_argument'?'이 페이지에 저장할 권한이 없어요.':'저장하지 못했어요. 다시 시도해 주세요.')}
 function chain(id,fn){queue[id]=(queue[id]||Promise.resolve()).then(fn).catch(fail)}
+// ── 되돌리기: 입력/수정/삭제/미루기를 묶음 단위로 기억했다가 거꾸로 돌린다 (이 화면을 닫기 전까지)
+const hist=[];let grp=null,undoing=false;
+const bodyOf=t=>{const b={...t};delete b.id;return b};
+function syncUndo(){const b=document.getElementById('undoBtn');if(b)b.disabled=!hist.length}
+function pushH(g){if(!g.length)return;hist.push(g);if(hist.length>30)hist.shift();syncUndo()}
+function rec(e){if(undoing)return;if(grp)grp.push(e);else pushH([e])}
+function group(fn){const prev=grp;grp=[];let g;try{fn()}finally{g=grp;grp=prev}if(prev)prev.push(...g);else pushH(g)}
+function rawSet(id,body){if(mode==='db')chain(id,()=>col.doc(id).set(body));
+  else{const i=todos.findIndex(x=>x.id===id),o={id,...body};if(i>=0)todos[i]=o;else todos.push(o)}}
+function rawDel(id){if(mode==='db')chain(id,()=>col.doc(id).delete());else todos=todos.filter(x=>x.id!==id)}
+function undo(){const g=hist.pop();syncUndo();if(!g){toast('되돌릴 게 없어요.');return}
+  undoing=true;try{for(const e of g.slice().reverse()){if(e.k==='add')rawDel(e.id);else rawSet(e.id,e.prev)}}finally{undoing=false}
+  if(mode==='local')saveLocal();render();
+  const k=g[0].k;toast(k==='add'?'방금 입력한 '+g.length+'개를 되돌렸어요.':k==='del'?'삭제를 되돌렸어요.':g.length>1?g.length+'개의 변경을 되돌렸어요.':'변경을 되돌렸어요.')}
 function addMany(items){
   if(!ready){toast('아직 불러오는 중이에요. 잠시 후 다시 눌러 주세요.');return false}
   if(items.some(it=>it.cat==='todo')&&!customTags.some(c=>c.k==='todo')){customTags=customTags.concat([{k:'todo',n:'할일',c:'#DCDCDC',w:[]}]);saveTags()}
   const t0=Date.now();
-  items.forEach((it,i)=>{const body={title:it.title,date:it.date,cat:it.cat,kind:it.kind==='event'?'event':'todo',done:!!it.done,moved:it.moved||0,created:t0+i};if(it.due)body.due=it.due;if(it.time)body.time=it.time;if(it.time2)body.time2=it.time2;if(it.end&&it.end>it.date)body.end=it.end;
-    if(mode==='db'){const ref=col.doc();chain(ref.id,()=>ref.set(body))}
-    else todos.push({id:'t'+t0+'_'+i+Math.random().toString(36).slice(2,6),...body})});
+  group(()=>items.forEach((it,i)=>{const body={title:it.title,date:it.date,cat:it.cat,kind:it.kind==='event'?'event':'todo',done:!!it.done,moved:it.moved||0,created:t0+i};if(it.due)body.due=it.due;if(it.time)body.time=it.time;if(it.time2)body.time2=it.time2;if(it.end&&it.end>it.date)body.end=it.end;
+    if(mode==='db'){const ref=col.doc();rec({k:'add',id:ref.id});chain(ref.id,()=>ref.set(body))}
+    else{const id='t'+t0+'_'+i+Math.random().toString(36).slice(2,6);rec({k:'add',id});todos.push({id,...body})}}));
   if(mode==='local'){saveLocal();render()}
   return true}
 function upd(id,patch){
+  {const t0=todos.find(x=>x.id===id);if(t0)rec({k:'edit',id,prev:bodyOf(t0)})}
   if(mode==='db')chain(id,()=>col.doc(id).update(patch));
   else{const t=todos.find(x=>x.id===id);if(t)Object.assign(t,patch);saveLocal();render()}}
 function del(id){
+  {const t0=todos.find(x=>x.id===id);if(t0)rec({k:'del',id,prev:bodyOf(t0)})}
   if(mode==='db')chain(id,()=>col.doc(id).delete());
   else{todos=todos.filter(x=>x.id!==id);saveLocal();render()}}
 
 // ── 미루기: 지난 날의 일은 오늘로, 오늘 이후의 일은 다음 날로
 const target=t=>t.date<today()?today():ymd(addDays(parseYmd(t.date),1));
 const moveLabel=d=>d<today()?'오늘로 미루기':'다음날로 미루기';
-function postpone(list){list.forEach(t=>{const to=target(t),patch={date:to,moved:(t.moved||0)+1};
+function postpone(list){group(()=>list.forEach(t=>{const to=target(t),patch={date:to,moved:(t.moved||0)+1};
   if(t.end&&t.end>t.date){const dd=Math.round((parseYmd(to)-parseYmd(t.date))/864e5);patch.end=ymd(addDays(parseYmd(t.end),dd))}
-  upd(t.id,patch)})}
+  upd(t.id,patch)}))}
 
 // ── 그리기
 function byDay(){const m={};const add=(k,t)=>(m[k]||(m[k]=[])).push(t);
@@ -606,10 +633,10 @@ function renderToday(list,td){
 }
 $('today').onchange=e=>{const id=e.target.dataset&&e.target.dataset.tid;if(id)upd(id,{done:e.target.checked})};
 function renderPreview(){
-  const items=splitDump($('dump').value);
-  $('preview').innerHTML=items.slice(0,12).map(it=>'<li'+(it.kind==='event'?' class="ev"':'')+' style="--cat:'+catVar(it.cat)+'"><span class="when">'+short(it.date)+(it.end?'~'+short(it.end):'')+(it.time?' '+korT(it):'')+' '+(it.kind==='event'?'일정':it.auto?'할 일 자동 추가':'할 일')+'</span><span class="hl">'+esc(it.title)+'</span></li>').join('')
+  const sp=splitAll($('dump').value),items=sp.items;
+  $('preview').innerHTML=sp.dels.map(k=>'<li class="del"><span class="when">삭제</span><span class="hl">‘'+esc(k)+'’ 일정 '+hits(k).length+'개</span></li>').join('')+items.slice(0,12).map(it=>'<li'+(it.kind==='event'?' class="ev"':'')+' style="--cat:'+catVar(it.cat)+'"><span class="when">'+short(it.date)+(it.end?'~'+short(it.end):'')+(it.time?' '+korT(it):'')+' '+(it.kind==='event'?'일정':it.auto?'할 일 자동 추가':'할 일')+'</span><span class="hl">'+esc(it.title)+'</span></li>').join('')
     +(items.length>12?'<li class="when">외 '+(items.length-12)+'개</li>':'');
-  $('dumpAdd').textContent=items.length?items.length+'개 캘린더에 넣기':'캘린더에 넣기';
+  $('dumpAdd').textContent=sp.dels.length&&!items.length?'삭제하기':items.length?items.length+'개 캘린더에 넣기'+(sp.dels.length?' + 삭제':''):'캘린더에 넣기';
   const ta=$('dump');ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';
 }
 const QUOTES=["미루기는 내일의 나에게 보내는 선물이다. 포장은 내가 안 한다.", "계획은 세우라고 있는 것이다. 지키라는 말은 어디에도 없다.", "할 일 목록이 길다는 건 당신이 그만큼 가능성이 많다는 뜻이다. 아마도.", "마감은 인간이 발명한 가장 정직한 시계다.", "일단 적었으면 반은 한 거다. 나머지 반은 내일 하면 된다.", "체크박스를 누르는 순간 도파민이 태어난다.", "오늘 못 한 일은 내일의 나에게 배움의 기회를 준 것이다.", "완벽한 계획은 없다. 다만 예쁜 색의 계획은 있다.", "하기 싫은 일도 일단 캘린더에 넣으면 내 잘못이 아니다.", "P는 계획하지 않는다. 계획이 P에게 찾아올 뿐이다.", "시작이 반이라면 지금 적고 있는 당신은 이미 반을 넘었다.", "시간은 금이다. 그래서 다들 모자란다.", "걱정은 내일의 나에게 맡기고 오늘은 일단 커피부터.", "할 일이 없는 날은 없다. 아직 안 적었을 뿐이다.", "마구 적어도 괜찮다. 정리는 캘린더가 한다.", "미룬 일이 쌓이면 그것을 사람들은 '다음 주'라 부른다.", "오늘의 나는 내일의 나를 믿는다. 내일의 나는 모르는 척한다.", "급할수록 돌아가라. 어차피 급한 일은 이미 늦었다.", "위대한 일은 대개 마감 하루 전에 이루어진다.", "밥은 먹고 하자. 모든 일정보다 우선하는 일정이다.", "한 번에 하나씩. 그게 안 되면 한 번에 하나씩 적기라도.", "어제의 미완료는 오늘의 도전과제다.", "할 일은 줄어들지 않는다. 다만 체크될 뿐이다.", "생각만 하던 일도 적으면 일이 된다. 그래서 무섭다.", "오늘 하루도 일정과 할 일 사이에서 무사하길.", "쉬는 것도 일정이다. 일단 적어 두자.", "느려도 괜찮다. 달력은 어차피 계속 넘어간다.", "하기 싫다는 감정도 오늘의 할 일에 포함된다.", "낮잠은 성실한 사람이 쓰는 고급 전략이다.", "목록의 마지막 항목을 지울 때 인간은 잠시 신이 된다.", "잘 쉬는 사람이 마감도 잘 낸다. 아마도 그렇다고 한다.", "결국 해낼 사람은 해낸다. 그 사이에 몇 번 딴짓할 뿐.", "오늘 할 일이 3개라면 하나만 해도 33%다. 훌륭하다.", "망설임은 짧게, 메모는 길게, 마감은 가볍게.", "누구에게나 미루고 싶은 날이 있다. 오늘이 그날이라면 내일 다시 오자.", "당신이 지금 이 페이지를 보고 있다는 사실이 이미 계획적인 행동이다."];
@@ -684,13 +711,19 @@ $('list').onclick=e=>{const a=e.target.dataset.act,li=e.target.closest('.item');
   if(a==='move'){const to=target(t);postpone([t]);toast('“'+t.title+'” → '+short(to)+'로 옮겼어요.')}
   else if(a==='kind')upd(t.id,isTodo(t)?{kind:'event',done:false}:{kind:'todo'});
   else if(a==='del'){const copy={...t};del(t.id);toast('지웠어요.',()=>addMany([copy]))}};
+$('undoBtn').onclick=undo;
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){const t=e.target;if(t&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;e.preventDefault();undo()}});
 $('bulk').onclick=()=>{const l=todos.filter(t=>t.date===sel&&isTodo(t)&&!t.done);if(!l.length)return;const to=target(l[0]);postpone(l);toast(l.length+'개를 '+short(to)+'로 옮겼어요.')};
 $('quickForm').onsubmit=e=>{e.preventDefault();const it=parseLine($('quick').value,sel);if(!it)return;
   if(addMany(expand(it))){$('quick').value='';if(it.date!==sel)toast(short(it.date)+'에 넣었어요.')}};
-function commitDump(){const items=splitDump($('dump').value);
-  if(!items.length){$('dump').focus();return}
-  if(addMany(items)){$('dump').value='';renderPreview();
-    toast('일정에 맞게 캘린더에 넣었어요!')}}
+function commitDump(){const sp=splitAll($('dump').value),items=sp.items;
+  if(!items.length&&!sp.dels.length){$('dump').focus();return}
+  if(!ready){toast('아직 불러오는 중이에요. 잠시 후 다시 눌러 주세요.');return}
+  const ids=new Set();sp.dels.forEach(k=>hits(k).forEach(t=>ids.add(t.id)));
+  group(()=>{ids.forEach(id=>del(id));if(items.length)addMany(items)});
+  $('dump').value='';renderPreview();
+  if(sp.dels.length){toast(ids.size?'‘'+sp.dels.join('·')+'’ 일정 '+ids.size+'개를 지웠어요.'+(items.length?' '+items.length+'개는 새로 넣었어요.':''):'지울 일정이 없어요.',ids.size?undo:null)}
+  else toast('일정에 맞게 캘린더에 넣었어요!')}
 $('dumpAdd').onclick=commitDump;
 $('dump').oninput=renderPreview;
 $('dump').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();commitDump()}};
