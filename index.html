@@ -39,9 +39,9 @@ button{cursor:pointer}
 .today .ts{font-size:11.5px;color:var(--muted)}
 .today ul{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
 .trow{display:flex;align-items:center;gap:9px;min-height:22px}
-.trow .when{width:62px;flex:none;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.trow .when{margin-left:2px;white-space:nowrap;flex:none;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 .trow input[type=checkbox]{width:14px;height:14px;margin:0;accent-color:var(--accent);cursor:pointer;flex:none}
-.trow .evdot{width:16px;height:16px;flex:none;display:grid;place-items:center}
+.trow .evdot{width:14px;height:14px;flex:none;display:grid;place-items:center}
 .trow .evdot:before{content:"";width:8px;height:8px;border-radius:50%;border:2px solid var(--cat)}
 .trow .hl{font-size:12.5px;padding:1px 4px}
 .trow.done .hl{background:transparent;color:var(--muted);text-decoration:line-through;padding-inline:0}
@@ -49,9 +49,12 @@ button{cursor:pointer}
 .quote{margin:18px 0 6px;text-align:center;font-size:12px;font-weight:350;color:#6F6F6F;line-height:1.7;text-wrap:balance}
 .today .none{margin:10px 0 0;font-size:12px;color:var(--muted)}
 .splash{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;animation:splOut .8s ease 2.9s forwards;cursor:pointer}
-.splash .mark{font-size:84px;opacity:0;animation:splUp .9s ease .15s forwards}
+.splash .mark{position:relative;left:.07em;font-size:84px;opacity:0;animation:splUp .9s ease .15s forwards}
 .splash .stag{margin:0;font-size:15px;font-weight:400;color:#BDBDBD;opacity:0;animation:splUp .9s ease .75s forwards}
-.splash svg{width:92px;height:auto;margin-top:6px;opacity:0;animation:splUp .9s ease 1.3s forwards}
+.splash .bars{width:92px;height:auto;margin-top:10px;overflow:visible}
+.splash .b{transform-box:fill-box;transform-origin:center;transform:scaleX(0);opacity:0;animation:barIn .7s cubic-bezier(.2,.8,.2,1) forwards}
+.splash .b1{animation-delay:1.2s}.splash .b2{animation-delay:1.4s}.splash .b3{animation-delay:1.6s}
+@keyframes barIn{to{transform:scaleX(1);opacity:1}}
 @keyframes splUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes splOut{to{opacity:0;visibility:hidden;pointer-events:none}}
 @media (prefers-reduced-motion:reduce){.splash{display:none}}
@@ -243,7 +246,7 @@ input[type=text]{width:100%;border:1px solid var(--line);background:var(--sunken
 <div class="splash" id="splash" aria-hidden="true">
   <div class="mark">pfp.</div>
   <p class="stag">P들을 위한 AI 플래너</p>
-  <svg viewBox="0 0 92 60" fill="none" aria-hidden="true"><rect x="1" y="1" width="90" height="58" rx="9" stroke="#3a3a3a" stroke-width="1.5"/><path d="M1 16h90" stroke="#3a3a3a" stroke-width="1.5"/><rect x="10" y="24" width="30" height="6" rx="3" fill="#B7D9FA"/><rect x="34" y="35" width="40" height="6" rx="3" fill="#F7C6DB"/><rect x="14" y="46" width="24" height="6" rx="3" fill="#BEE8CF"/><circle cx="12" cy="8.5" r="2" fill="#FFF0A0"/></svg>
+  <svg class="bars" viewBox="0 0 92 40" fill="none" aria-hidden="true"><rect class="b b1" x="16" y="2" width="60" height="7" rx="3.5" fill="#B7D9FA"/><rect class="b b2" x="26" y="16" width="40" height="7" rx="3.5" fill="#F7C6DB"/><rect class="b b3" x="10" y="30" width="72" height="7" rx="3.5" fill="#BEE8CF"/></svg>
 </div>
 <div class="wrap">
   <div class="logo"><span class="mark" role="img" aria-label="pfp, Plan for P">pfp.</span></div>
@@ -546,9 +549,9 @@ function render(){
 function renderToday(list,td){
   const d=parseYmd(td),evs=list.filter(t=>!isTodo(t)),tds=list.filter(isTodo),left=tds.filter(t=>!t.done).length;
   const row=t=>{const ev=!isTodo(t),id=esc(t.id);
-    return '<li class="trow'+(!ev&&t.done?' done':'')+'" style="--cat:'+catVar(t.cat)+'"><span class="when">'+(t.time?kor(t.time):ev?'종일':'')+'</span>'
+    return '<li class="trow'+(!ev&&t.done?' done':'')+'" style="--cat:'+catVar(t.cat)+'">'
       +(ev?'<span class="evdot" aria-hidden="true"></span><span class="hl" style="background:transparent;color:var(--cat);box-shadow:inset 0 0 0 1px var(--cat)">'+esc(t.title)+'</span>'
-        :'<input type="checkbox" data-tid="'+id+'" '+(t.done?'checked':'')+' aria-label="'+esc(t.title)+' 완료"><span class="hl">'+esc(t.title)+'</span>')+'</li>'};
+        :'<input type="checkbox" data-tid="'+id+'" '+(t.done?'checked':'')+' aria-label="'+esc(t.title)+' 완료"><span class="hl">'+esc(t.title)+'</span>')+(t.time?'<span class="when">'+kor(t.time)+'</span>':'')+'</li>'};
   const sum=!list.length?'':(evs.length?'일정 '+evs.length+'개':'')+(evs.length&&tds.length?' · ':'')+(tds.length?(left?'남은 할 일 '+left+'개':'할 일 모두 끝!'):'');
   $('today').innerHTML='<div class="th"><div class="tt">오늘의 TDL<small>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 '+DOW[d.getDay()]+'요일</small></div><div class="ts">'+sum+'</div></div>'
     +(list.length?'<ul>'+evs.map(row).join('')+tds.map(row).join('')+'</ul>':'<p class="none">'+(ready?'오늘은 아직 비어 있어요. 아래에 막 적어 보세요.':'불러오는 중…')+'</p>');
