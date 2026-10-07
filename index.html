@@ -174,8 +174,11 @@ input[type=text]{width:100%;border:1px solid var(--line);background:var(--sunken
   .bar{flex-wrap:nowrap;padding:6px 6px 6px 14px;gap:8px}
   .bar label{display:none}
   .bar textarea{padding:8px 0}
+  .bar textarea::placeholder{font-size:12.5px;line-height:1.5;white-space:nowrap}
   .bar .btn{min-height:34px;padding:3px 11px}
   .month{font-size:24px}
+  .grid{border:0;border-radius:0}
+  .grid>:nth-child(7n+1){border-left:0}
   .cell{min-height:58px;padding:4px;align-items:center;gap:4px}
   .chips{gap:3px}
   .chip{height:5px;border-radius:2px;font-size:0;line-height:0;background:var(--cat);display:block}
